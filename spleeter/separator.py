@@ -16,7 +16,6 @@ import os
 import json
 
 from functools import partial
-from multiprocessing import Pool
 from pathlib import Path
 from os.path import basename, join, splitext
 
@@ -45,8 +44,6 @@ class Separator(object):
         self._sample_rate = self._params['sample_rate']
         self._MWF = MWF
         self._predictor = None
-        self._pool = Pool()
-        self._tasks = []
 
     def _get_predictor(self):
         """ Lazy loading access method for internal predictor instance.
@@ -63,10 +60,7 @@ class Separator(object):
 
         :param timeout: (Optional) task waiting timeout.
         """
-        while len(self._tasks) > 0:
-            task = self._tasks.pop()
-            task.get()
-            task.wait(timeout=timeout)
+        return
 
     def separate(self, waveform):
         """ Performs source separation over the given waveform.
@@ -121,7 +115,7 @@ class Separator(object):
             duration=duration,
             sample_rate=self._sample_rate)
         sources = self.separate(waveform)
-        filename = splitext(basename(audio_descriptor))
+        filename = splitext(basename(audio_descriptor))[0]
         generated = []
         for instrument, data in sources.items():
             path = join(destination, filename_format.format(
@@ -133,12 +127,4 @@ class Separator(object):
                     f'Separated source path conflict : {path},'
                     'please check your filename format'))
             generated.append(path)
-            task = self._pool.apply_async(audio_adapter.save, (
-                path,
-                data,
-                self._sample_rate,
-                codec,
-                bitrate))
-            self._tasks.append(task)
-        if synchronous:
-            self.join()
+            audio_adapter.save(path,data,self._sample_rate,codec,bitrate)
